@@ -1,0 +1,1163 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#080b10">
+  <title>Signal Lost: The Final Transmission</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #080b10;
+      --panel: rgba(13, 18, 25, .88);
+      --panel-light: rgba(22, 29, 38, .82);
+      --line: rgba(162, 183, 199, .16);
+      --muted: #87939e;
+      --text: #e5e9e8;
+      --red: #ff4a4a;
+      --red-dim: #b52f38;
+      --cyan: #78d9df;
+      --gold: #d8b879;
+      --mono: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+      --sans: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-width: 320px;
+      min-height: 100vh;
+      color: var(--text);
+      background: var(--bg);
+      font: 14px/1.55 var(--sans);
+    }
+    button, select { font: inherit; }
+    button { color: inherit; }
+    button:focus-visible, select:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
+    .sky, .grain, .vignette { position: fixed; inset: 0; pointer-events: none; }
+    .sky {
+      z-index: -3;
+      background:
+        radial-gradient(ellipse at 52% 43%, rgba(34, 53, 66, .17), transparent 48%),
+        linear-gradient(180deg, #080b10 0%, #0c1118 72%, #080b10 100%);
+    }
+    .stars { position: absolute; inset: -20%; overflow: hidden; }
+    .stars::before, .stars::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image:
+        radial-gradient(1px 1px at 18% 24%, #c6d5dc 70%, transparent),
+        radial-gradient(1px 1px at 76% 17%, #d1dbe1 70%, transparent),
+        radial-gradient(1.5px 1.5px at 50% 72%, #9fb8c2 70%, transparent),
+        radial-gradient(1px 1px at 87% 63%, #c6d5dc 70%, transparent),
+        radial-gradient(1px 1px at 30% 84%, #9fb8c2 70%, transparent),
+        radial-gradient(1px 1px at 64% 45%, #c6d5dc 70%, transparent);
+      background-size: 390px 310px;
+      opacity: .48;
+      animation: drift 95s linear infinite;
+    }
+    .stars::after { background-size: 270px 230px; opacity: .22; animation-duration: 145s; animation-direction: reverse; }
+    .grain {
+      z-index: -1;
+      opacity: .14;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.18'/%3E%3C/svg%3E");
+      mix-blend-mode: screen;
+    }
+    .vignette { z-index: -2; box-shadow: inset 0 0 180px 40px #020406; }
+    .emergency-glow {
+      position: fixed;
+      top: -34vh;
+      left: 50%;
+      z-index: -2;
+      width: min(1100px, 140vw);
+      height: 62vh;
+      border-radius: 50%;
+      background: rgba(179, 17, 28, .1);
+      filter: blur(95px);
+      transform: translateX(-50%);
+      animation: pulse 5s ease-in-out infinite;
+      pointer-events: none;
+    }
+    @keyframes drift { to { transform: translate3d(3%, 2%, 0); } }
+    @keyframes pulse { 50% { opacity: .42; } }
+    @keyframes flicker { 0%, 97%, 100% { opacity: 1; } 98% { opacity: .72; } 99% { opacity: .9; } }
+    .shell { width: min(1120px, calc(100% - 48px)); margin: auto; padding: 28px 0 48px; }
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      padding: 0 0 18px;
+      border-bottom: 1px solid var(--line);
+    }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .brand-mark {
+      display: grid;
+      width: 31px;
+      height: 31px;
+      place-items: center;
+      border: 1px solid rgba(255, 74, 74, .5);
+      color: var(--red);
+      font: 700 12px var(--mono);
+      box-shadow: 0 0 20px rgba(255, 74, 74, .12);
+    }
+    .brand-name { font: 700 11px var(--mono); letter-spacing: .2em; }
+    .brand-sub { margin-top: 2px; color: var(--muted); font: 9px var(--mono); letter-spacing: .12em; }
+    .top-actions { display: flex; align-items: center; gap: 18px; }
+    .status-pill, .timer { display: flex; align-items: center; gap: 8px; font: 10px var(--mono); letter-spacing: .1em; }
+    .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--red); box-shadow: 0 0 10px var(--red); animation: flicker 3s infinite; }
+    .timer { color: var(--red); }
+    .timer strong { font-size: 17px; letter-spacing: .06em; }
+    .quiet-button {
+      padding: 7px 9px;
+      border: 1px solid var(--line);
+      background: transparent;
+      color: #b4bec4;
+      cursor: pointer;
+      font: 9px var(--mono);
+      letter-spacing: .1em;
+      transition: color .2s, border-color .2s;
+    }
+    .quiet-button:hover { border-color: var(--cyan); color: var(--cyan); }
+    .eyebrow { color: var(--red); font: 10px var(--mono); letter-spacing: .22em; text-transform: uppercase; }
+    .screen { display: none; }
+    .screen.active { display: block; }
+    .intro {
+      min-height: calc(100vh - 95px);
+      display: grid;
+      grid-template-columns: 1.15fr .85fr;
+      align-items: center;
+      gap: 64px;
+      padding: 58px 4vw;
+    }
+    .intro h1 {
+      max-width: 670px;
+      margin: 18px 0 20px;
+      font-size: clamp(42px, 7vw, 78px);
+      line-height: .98;
+      font-weight: 500;
+      letter-spacing: -.055em;
+    }
+    .intro h1 span { display: block; color: #a9b6bc; font-size: .57em; line-height: 1.3; letter-spacing: .01em; font-weight: 300; }
+    .intro-copy { max-width: 490px; color: #a8b2b8; font-size: 15px; }
+    .signal-quote { margin: 32px 0; padding: 0 0 0 16px; border-left: 1px solid var(--red-dim); color: #d3d8d8; font: 12px/1.8 var(--mono); }
+    .signal-quote small { display: block; margin-top: 8px; color: var(--muted); font-size: 9px; letter-spacing: .12em; }
+    .primary-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      padding: 13px 19px;
+      border: 1px solid rgba(255, 74, 74, .58);
+      background: linear-gradient(100deg, rgba(162, 32, 41, .38), rgba(69, 22, 29, .18));
+      color: #fff;
+      cursor: pointer;
+      font: 10px var(--mono);
+      letter-spacing: .16em;
+      text-transform: uppercase;
+      transition: .2s ease;
+    }
+    .primary-button:hover { border-color: var(--red); background: rgba(173, 37, 47, .43); box-shadow: 0 0 25px rgba(255, 74, 74, .12); transform: translateY(-1px); }
+    .primary-button:disabled { cursor: not-allowed; opacity: .45; transform: none; box-shadow: none; }
+    .intro-visual { position: relative; display: grid; min-height: 380px; place-items: center; }
+    .planet {
+      position: relative;
+      width: min(32vw, 340px);
+      aspect-ratio: 1;
+      border-radius: 50%;
+      background:
+        radial-gradient(ellipse at 35% 37%, rgba(100, 131, 145, .36), transparent 34%),
+        radial-gradient(ellipse at 68% 67%, rgba(73, 83, 89, .75), transparent 39%),
+        radial-gradient(circle at 40% 40%, #293744 0%, #17222b 45%, #06090d 74%);
+      box-shadow: inset -34px -8px 75px #030507, inset 14px 5px 36px rgba(123, 168, 182, .16), 0 0 70px rgba(82, 129, 147, .09);
+    }
+    .planet::before {
+      content: "";
+      position: absolute;
+      inset: 18% -17%;
+      border: 1px solid rgba(126, 161, 171, .2);
+      border-radius: 50%;
+      transform: rotate(-19deg) scaleY(.32);
+      box-shadow: 0 0 24px rgba(118, 169, 177, .1);
+    }
+    .planet::after {
+      content: "KEPLER-9  /  NO RESPONSE";
+      position: absolute;
+      right: -22%;
+      bottom: 10%;
+      color: #81919a;
+      font: 8px var(--mono);
+      letter-spacing: .12em;
+      white-space: nowrap;
+    }
+    .radar {
+      position: absolute;
+      width: min(42vw, 460px);
+      aspect-ratio: 1;
+      border: 1px solid rgba(132, 164, 175, .1);
+      border-radius: 50%;
+    }
+    .radar::before, .radar::after { content: ""; position: absolute; border: 1px solid rgba(132, 164, 175, .08); border-radius: 50%; inset: 14%; }
+    .radar::after { inset: 28%; }
+    .intro-note { position: absolute; right: 0; top: 9%; color: #6e7e87; font: 9px/1.8 var(--mono); letter-spacing: .09em; }
+    .game-head { padding: 35px 0 22px; }
+    .game-head h1 { margin: 7px 0 5px; font-size: clamp(25px, 3vw, 36px); font-weight: 450; letter-spacing: -.03em; }
+    .game-head p { margin: 0; color: var(--muted); }
+    .game-layout { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 18px; align-items: start; }
+    .main-panel, .side-panel, .tab-content, .deduction-card, .ending-card {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      box-shadow: 0 18px 60px rgba(0,0,0,.18);
+      backdrop-filter: blur(9px);
+    }
+    .tabs { display: flex; border-bottom: 1px solid var(--line); }
+    .tab {
+      padding: 13px 18px;
+      border: 0;
+      border-bottom: 1px solid transparent;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      font: 9px var(--mono);
+      letter-spacing: .13em;
+    }
+    .tab:hover, .tab.active { color: var(--cyan); }
+    .tab.active { border-bottom-color: var(--cyan); }
+    .tab-content { display: none; min-height: 430px; padding: 26px; border: 0; background: transparent; box-shadow: none; }
+    .tab-content.active { display: block; }
+    .section-kicker { margin-bottom: 8px; color: var(--cyan); font: 9px var(--mono); letter-spacing: .16em; text-transform: uppercase; }
+    .room-title { margin: 0 0 9px; font-size: 25px; font-weight: 450; }
+    .room-copy { max-width: 680px; color: #a7b2b8; }
+    .room-line { height: 1px; margin: 22px 0; background: var(--line); }
+    .location-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 7px; margin: 20px 0; }
+    .location-button {
+      min-height: 59px;
+      padding: 8px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.018);
+      color: #aab5bb;
+      cursor: pointer;
+      font: 9px/1.4 var(--mono);
+      text-align: left;
+      transition: .2s;
+    }
+    .location-button:hover, .location-button.active { border-color: rgba(120,217,223,.55); color: var(--cyan); background: rgba(120,217,223,.055); }
+    .location-button.found::after { content: "  +"; color: var(--gold); }
+    .inspect-box {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      padding: 16px 17px;
+      border: 1px solid rgba(216,184,121,.19);
+      background: linear-gradient(100deg, rgba(216,184,121,.055), transparent);
+    }
+    .inspect-box h3 { margin: 0 0 3px; color: #e7d4a9; font-size: 13px; font-weight: 500; }
+    .inspect-box p { margin: 0; color: #9da8ac; font-size: 11px; }
+    .inspect-button { flex: 0 0 auto; padding: 9px 12px; border: 1px solid rgba(216,184,121,.4); background: transparent; color: var(--gold); cursor: pointer; font: 9px var(--mono); letter-spacing: .1em; }
+    .inspect-button:hover { background: rgba(216,184,121,.1); }
+    .evidence-count { color: var(--gold); font: 10px var(--mono); }
+    .side-panel { padding: 19px; }
+    .side-title { display: flex; justify-content: space-between; align-items: center; margin: 0 0 13px; font: 10px var(--mono); letter-spacing: .13em; }
+    .clue-list { display: grid; gap: 8px; }
+    .clue-item { padding: 10px; border-left: 2px solid rgba(216,184,121,.46); background: rgba(255,255,255,.025); }
+    .clue-item b { display: block; color: #d9c69e; font-size: 10px; font-weight: 500; }
+    .clue-item span { color: #829099; font: 8px var(--mono); letter-spacing: .08em; }
+    .empty-clues { padding: 13px 10px; border: 1px dashed var(--line); color: #77858d; font-size: 11px; }
+    .board-progress { margin-top: 17px; padding-top: 14px; border-top: 1px solid var(--line); }
+    .progress-label { display: flex; justify-content: space-between; margin-bottom: 8px; color: #98a5ab; font: 9px var(--mono); letter-spacing: .08em; }
+    .progress-track { height: 3px; background: #222a31; }
+    .progress-fill { width: 0; height: 100%; background: var(--gold); transition: width .35s; }
+    .board-button { width: 100%; margin-top: 15px; padding: 10px; border: 1px solid var(--line); background: transparent; color: #bbc4c7; cursor: pointer; font: 9px var(--mono); letter-spacing: .1em; }
+    .board-button:hover:not(:disabled) { border-color: var(--cyan); color: var(--cyan); }
+    .board-button:disabled { color: #66727a; cursor: not-allowed; }
+    .terminal-shell { display: grid; gap: 17px; }
+    .terminal-display {
+      min-height: 145px;
+      padding: 17px;
+      border: 1px solid rgba(120,217,223,.18);
+      background: radial-gradient(ellipse at top left, rgba(40,104,109,.13), rgba(3,7,10,.5));
+    }
+    .terminal-meta { display: flex; justify-content: space-between; margin-bottom: 15px; color: #7b989b; font: 9px var(--mono); letter-spacing: .12em; }
+    .terminal-output { color: #c4d6d4; font: 12px/1.8 var(--mono); white-space: pre-line; }
+    .prompt-label { color: #87949b; font: 9px var(--mono); letter-spacing: .1em; }
+    .dialogue-options { display: grid; gap: 8px; margin-top: 8px; }
+    .dialogue-option {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 13px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.02);
+      color: #c2c9c9;
+      cursor: pointer;
+      text-align: left;
+      font-size: 11px;
+    }
+    .dialogue-option::after { content: "›"; color: var(--cyan); font-size: 18px; }
+    .dialogue-option:hover:not(:disabled) { border-color: rgba(120,217,223,.45); background: rgba(120,217,223,.04); }
+    .dialogue-option:disabled { color: #67737b; cursor: default; }
+    .ai-status { margin-top: 13px; color: #87969c; font: 9px var(--mono); }
+    .ai-status strong { color: var(--cyan); font-weight: 400; }
+    .deduction-wrap { max-width: 760px; margin: 0 auto; padding: 45px 0; }
+    .deduction-intro { margin: 8px 0 24px; color: #9ca8ae; }
+    .deduction-card { padding: 25px; }
+    .question { margin: 0 0 18px; padding: 0 0 17px; border-bottom: 1px solid var(--line); }
+    .question:last-of-type { border-bottom: 0; }
+    .question label { display: block; margin-bottom: 8px; color: #d4dcda; font-size: 12px; }
+    .question select { width: 100%; padding: 11px 12px; border: 1px solid var(--line); border-radius: 0; background: #10171e; color: #b9c3c5; }
+    .deduction-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 18px; }
+    .deduction-feedback { min-height: 20px; color: var(--gold); font-size: 11px; }
+    .ending-wrap { max-width: 760px; margin: 0 auto; padding: 56px 0; }
+    .ending-card { padding: clamp(24px, 6vw, 46px); }
+    .ending-card h1 { margin: 12px 0; font-size: clamp(32px, 6vw, 54px); font-weight: 450; letter-spacing: -.04em; line-height: 1.03; }
+    .ending-card .story { color: #adb8ba; font-size: 14px; line-height: 1.9; }
+    .ending-card .last-line { margin: 26px 0; padding-left: 15px; border-left: 1px solid var(--red); color: #e6d6b7; font: 12px/1.8 var(--mono); }
+    .ending-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 20px; border-top: 1px solid var(--line); color: var(--muted); font: 9px var(--mono); letter-spacing: .1em; }
+    .toast { position: fixed; left: 50%; bottom: 25px; z-index: 3; max-width: calc(100vw - 30px); padding: 11px 15px; border: 1px solid rgba(120,217,223,.35); background: #10191d; color: #cde1df; font: 10px var(--mono); box-shadow: 0 8px 30px #0008; opacity: 0; transform: translate(-50%, 10px); transition: .25s; pointer-events: none; }
+    .toast.show { opacity: 1; transform: translate(-50%, 0); }
+    .footer { margin-top: 19px; color: #65717a; font: 8px var(--mono); letter-spacing: .11em; text-align: center; }
+    .station-atmosphere {
+      position: relative;
+      overflow: hidden;
+      padding: 16px;
+      border: 1px solid rgba(120, 165, 178, .18);
+      background:
+        radial-gradient(ellipse at 50% 110%, rgba(37, 102, 111, .14), transparent 58%),
+        linear-gradient(145deg, rgba(11, 23, 30, .94), rgba(7, 12, 17, .94));
+    }
+    .station-atmosphere::before, .station-atmosphere::after {
+      content: "";
+      position: absolute;
+      pointer-events: none;
+    }
+    .station-atmosphere::before {
+      inset: 0;
+      opacity: .46;
+      background-image: radial-gradient(1px 1px at 13% 21%, #a2c6ce 70%, transparent), radial-gradient(1px 1px at 78% 32%, #a2c6ce 70%, transparent), radial-gradient(1px 1px at 46% 72%, #a2c6ce 70%, transparent), radial-gradient(1px 1px at 91% 82%, #a2c6ce 70%, transparent);
+      background-size: 180px 110px;
+      animation: map-stars 24s linear infinite;
+    }
+    .station-atmosphere::after {
+      inset: 0 0 auto;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, rgba(255,74,74,.7), transparent);
+      opacity: .6;
+      animation: scanline 6s ease-in-out infinite;
+    }
+    @keyframes map-stars { to { background-position: 180px 110px; } }
+    @keyframes scanline { 50% { transform: translateY(175px); opacity: .18; } }
+    .map-caption { position: relative; z-index: 1; display: flex; justify-content: space-between; gap: 10px; margin-bottom: 13px; color: #83949c; font: 8px var(--mono); letter-spacing: .12em; }
+    .map-caption strong { color: var(--cyan); font-weight: 400; }
+    .location-grid {
+      position: relative;
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 7px;
+      margin: 0;
+      isolation: isolate;
+    }
+    .map-route {
+      position: absolute;
+      inset: 50% 4% auto;
+      z-index: -1;
+      width: 92%;
+      height: 20px;
+      overflow: visible;
+      transform: translateY(-50%);
+    }
+    .map-route path { fill: none; stroke: rgba(120,217,223,.28); stroke-width: 1.4; stroke-dasharray: 5 5; animation: route-flow 12s linear infinite; }
+    @keyframes route-flow { to { stroke-dashoffset: -40; } }
+    .location-button {
+      position: relative;
+      display: flex;
+      min-width: 0;
+      min-height: 115px;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 9px;
+      border: 1px solid rgba(139,171,182,.2);
+      background: linear-gradient(155deg, rgba(27,41,48,.94), rgba(9,15,20,.97));
+      box-shadow: inset 0 1px rgba(255,255,255,.035), 0 8px 18px rgba(0,0,0,.18);
+      color: #9eafb5;
+      font: 8px/1.4 var(--mono);
+      transition: border-color .2s, background .2s, transform .25s, box-shadow .2s;
+      text-align: left;
+    }
+    .location-button::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 9px;
+      width: 20px;
+      height: 2px;
+      background: rgba(120,217,223,.55);
+    }
+    .location-button::after { content: "UNSEARCHED"; margin: 0; color: #687980; font: 7px var(--mono); letter-spacing: .08em; }
+    .location-button:hover, .location-button.active {
+      z-index: 2;
+      transform: translateY(-3px);
+      border-color: rgba(120,217,223,.7);
+      background: linear-gradient(155deg, rgba(28,64,69,.94), rgba(10,21,26,.98));
+      box-shadow: 0 0 19px rgba(120,217,223,.1), inset 0 0 18px rgba(120,217,223,.035);
+      color: #def1ed;
+    }
+    .location-button.found::after { content: "EVIDENCE LOGGED"; color: var(--gold); }
+    .room-glyph { display: grid; width: 25px; height: 25px; place-items: center; border: 1px solid rgba(120,217,223,.24); color: var(--cyan); font: 11px var(--mono); }
+    .room-node-label { display: block; color: #d0dadd; font-size: 8px; letter-spacing: .04em; }
+    .room-node-index { color: #70848d; font-size: 7px; letter-spacing: .1em; }
+    .room-scene { animation: room-arrive .42s cubic-bezier(.2,.7,.2,1) both; }
+    @keyframes room-arrive { from { opacity: .42; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+    .room-art {
+      position: relative;
+      display: grid;
+      min-height: 110px;
+      margin: 17px 0;
+      overflow: hidden;
+      place-items: center;
+      border: 1px solid rgba(134,169,179,.13);
+      background:
+        radial-gradient(ellipse at 50% 115%, rgba(78,124,131,.17), transparent 55%),
+        linear-gradient(180deg, rgba(13,24,30,.64), rgba(6,11,15,.7));
+    }
+    .room-art::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      opacity: .22;
+      background: repeating-linear-gradient(0deg, transparent 0 21px, rgba(129,170,178,.18) 22px, transparent 23px), repeating-linear-gradient(90deg, transparent 0 52px, rgba(129,170,178,.12) 53px, transparent 54px);
+    }
+    .room-art svg { position: relative; width: min(100%, 480px); height: 100px; opacity: .82; }
+    .room-art .room-lamp { animation: lamp-blink 2.6s steps(2, jump-none) infinite; }
+    @keyframes lamp-blink { 50% { opacity: .26; } }
+    .evidence-board {
+      position: relative;
+      height: 177px;
+      overflow: hidden;
+      margin: 0 0 12px;
+      border: 1px solid rgba(216,184,121,.17);
+      background:
+        radial-gradient(ellipse at center, rgba(110,79,43,.1), transparent 70%),
+        repeating-linear-gradient(0deg, transparent 0 25px, rgba(216,184,121,.035) 26px),
+        repeating-linear-gradient(90deg, transparent 0 25px, rgba(216,184,121,.035) 26px),
+        #111518;
+      box-shadow: inset 0 0 30px #0008;
+    }
+    .evidence-connections { position: absolute; inset: 0; width: 100%; height: 100%; }
+    .evidence-connections path { fill: none; stroke: rgba(216,184,121,.25); stroke-width: 1.2; stroke-dasharray: 4 5; transition: stroke .3s, stroke-width .3s; }
+    .evidence-connections path.connected { stroke: rgba(255,193,91,.88); stroke-width: 1.8; filter: drop-shadow(0 0 3px rgba(255,193,91,.45)); }
+    .evidence-node {
+      position: absolute;
+      z-index: 1;
+      display: grid;
+      width: 36px;
+      height: 36px;
+      padding: 0;
+      place-items: center;
+      border: 1px solid rgba(131,146,149,.33);
+      border-radius: 50%;
+      background: #151a1b;
+      color: #667278;
+      cursor: not-allowed;
+      font: 9px var(--mono);
+      transition: .22s ease;
+    }
+    .evidence-node[data-clue="airlock"] { left: 5%; top: 11%; }
+    .evidence-node[data-clue="quarters"] { left: 40%; top: 5%; }
+    .evidence-node[data-clue="reactor"] { right: 5%; top: 23%; }
+    .evidence-node[data-clue="comms"] { left: 18%; bottom: 7%; }
+    .evidence-node[data-clue="observation"] { right: 20%; bottom: 6%; }
+    .evidence-node.found { border-color: rgba(216,184,121,.72); background: #29241a; color: #f0cb80; cursor: pointer; box-shadow: 0 0 13px rgba(216,184,121,.12); }
+    .evidence-node.found:hover, .evidence-node.found.selected { transform: scale(1.1); background: #41331d; box-shadow: 0 0 17px rgba(216,184,121,.25); }
+    .evidence-node span { position: absolute; top: 39px; left: 50%; width: 83px; color: #879092; font: 7px var(--mono); letter-spacing: .04em; text-align: center; transform: translateX(-50%); }
+    .evidence-node.found span { color: #cfbd98; }
+    .evidence-detail { min-height: 86px; padding: 10px; border-left: 2px solid rgba(216,184,121,.48); background: rgba(255,255,255,.025); }
+    .evidence-detail-title { display: block; margin-bottom: 4px; color: #dfc992; font-size: 10px; font-weight: 500; }
+    .evidence-detail-copy { color: #93a0a2; font-size: 9px; line-height: 1.55; }
+    .evidence-attribution { display: flex; align-items: center; gap: 7px; margin-top: 8px; color: #a5b8b5; font: 7px var(--mono); letter-spacing: .06em; }
+    .evidence-attribution svg { width: 22px; height: 24px; border: 1px solid rgba(120,217,223,.24); background: #10191c; }
+    .speaker-panel { display: grid; grid-template-columns: 106px minmax(0,1fr); gap: 15px; align-items: center; min-height: 122px; }
+    .speaker-portrait { position: relative; display: grid; width: 106px; height: 122px; overflow: hidden; place-items: center; border: 1px solid rgba(120,217,223,.27); background: radial-gradient(ellipse at 50% 20%, rgba(42,103,108,.3), #081015 76%); }
+    .speaker-portrait::after { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(0deg, transparent 0 4px, rgba(134,218,215,.045) 5px, transparent 6px); pointer-events: none; }
+    .speaker-portrait svg { width: 100%; height: 100%; }
+    .speaker-copy { min-width: 0; }
+    .speaker-name { display: block; margin-bottom: 7px; color: var(--cyan); font: 9px var(--mono); letter-spacing: .14em; }
+    .terminal-output { color: #c4d6d4; font: 11px/1.75 var(--mono); white-space: pre-line; }
+    .crew-roster { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; margin-top: 2px; }
+    .crew-card { display: flex; min-width: 0; align-items: center; gap: 8px; padding: 7px; border: 1px solid var(--line); background: rgba(255,255,255,.018); color: #adb8ba; cursor: pointer; text-align: left; transition: .2s; }
+    .crew-card:hover, .crew-card.active { border-color: rgba(120,217,223,.42); background: rgba(120,217,223,.045); }
+    .crew-card svg { flex: 0 0 33px; width: 33px; height: 36px; border: 1px solid rgba(143,173,178,.23); background: #10191c; }
+    .crew-card b { display: block; color: #d0dcda; font-size: 8px; font-weight: 500; }
+    .crew-card span { display: block; margin-top: 3px; color: #78878b; font: 7px var(--mono); }
+    @media (max-width: 620px) {
+      .station-atmosphere { padding: 12px 9px; }
+      .location-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .map-route { display: none; }
+      .location-button { min-height: 93px; }
+      .location-button:last-child { grid-column: auto; }
+      .room-art { min-height: 90px; }
+      .room-art svg { height: 80px; }
+      .evidence-board { height: 168px; }
+      .speaker-panel { grid-template-columns: 78px minmax(0,1fr); gap: 11px; }
+      .speaker-portrait { width: 78px; height: 106px; }
+      .crew-roster { gap: 5px; }
+      .crew-card { flex-direction: column; align-items: flex-start; gap: 5px; padding: 6px; }
+      .crew-card svg { width: 100%; height: 54px; }
+    }
+    @media (max-width: 850px) {
+      .game-layout { grid-template-columns: 1fr; }
+      .side-panel { display: grid; grid-template-columns: 1fr 1fr; gap: 0 20px; }
+      .side-title, .clue-list { grid-column: 1; }
+      .board-progress { grid-column: 2; grid-row: 1 / span 2; align-self: center; margin: 0; padding: 0; border: 0; }
+      .intro { gap: 25px; padding-inline: 1vw; }
+    }
+    @media (max-width: 620px) {
+      .shell { width: min(100% - 28px, 540px); padding-top: 17px; }
+      .topbar { align-items: flex-start; }
+      .top-actions { flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+      .status-pill { display: none; }
+      .timer { gap: 5px; }
+      .timer strong { font-size: 14px; }
+      .intro { min-height: auto; grid-template-columns: 1fr; gap: 8px; padding: 58px 4px 35px; }
+      .intro-copy { font-size: 13px; }
+      .intro-visual { min-height: 230px; grid-row: 1; }
+      .planet { width: min(52vw, 220px); }
+      .radar { width: min(68vw, 300px); }
+      .intro-note { right: 7%; top: 4%; }
+      .planet::after { right: -22%; font-size: 7px; }
+      .game-head { padding: 26px 0 16px; }
+      .tab-content { min-height: 0; padding: 20px 16px; }
+      .location-grid { grid-template-columns: repeat(2, 1fr); }
+      .location-button:last-child { grid-column: 1 / -1; }
+      .inspect-box { align-items: flex-start; flex-direction: column; gap: 11px; }
+      .side-panel { display: block; }
+      .board-progress { margin-top: 17px; padding-top: 14px; border-top: 1px solid var(--line); }
+      .deduction-wrap, .ending-wrap { padding: 30px 0; }
+      .deduction-card { padding: 18px; }
+      .deduction-actions, .ending-footer { align-items: flex-start; flex-direction: column; }
+      .footer { line-height: 1.8; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="sky" aria-hidden="true"><div class="stars"></div></div>
+  <div class="emergency-glow" aria-hidden="true"></div>
+  <div class="grain" aria-hidden="true"></div>
+  <div class="vignette" aria-hidden="true"></div>
+
+  <div class="shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">S/9</div>
+        <div><div class="brand-name">SIGNAL LOST</div><div class="brand-sub">DEEP SPACE INCIDENT REPORT</div></div>
+      </div>
+      <div class="top-actions">
+        <div class="status-pill"><span class="status-dot"></span><span id="statusText">SIGNAL DETECTED</span></div>
+        <div class="timer" aria-live="polite"><span>O₂ WINDOW</span><strong id="timer">12:00</strong></div>
+        <button class="quiet-button" id="soundToggle" type="button" aria-pressed="false">SOUND: OFF</button>
+        <button class="quiet-button" id="restartButton" type="button">RESTART</button>
+      </div>
+    </header>
+
+    <main>
+      <section id="introScreen" class="screen active" aria-labelledby="title">
+        <div class="intro">
+          <div>
+            <div class="eyebrow">A SIGNAL LOST interactive mystery</div>
+            <h1 id="title">The Final<span>Transmission</span></h1>
+            <p class="intro-copy">A distress call has arrived from Kepler-9, a research station that went dark eleven years ago. Your ship is the first to answer. The signal is still repeating. Someone — or something — is waiting.</p>
+            <blockquote class="signal-quote">“...don't let it hear you answer...<br>...ECHO, open the doors...”<small>INCOMING TRANSMISSION  /  ORIGIN: KEPLER-9</small></blockquote>
+            <button class="primary-button" id="beginButton" type="button">Accept the signal <span aria-hidden="true">→</span></button>
+            <div class="intro-copy" style="margin-top:18px;font-size:11px">
+              <span class="eyebrow" style="font-size:9px">FIELD GUIDE</span><br>
+              Search all five sectors and examine their evidence. Question ECHO for its account, then connect the clues in your deduction. Your final choice determines what happens to the crew — and the signal.
+            </div>
+          </div>
+          <div class="intro-visual" aria-hidden="true">
+            <div class="radar"></div><div class="planet"></div>
+            <div class="intro-note">BEACON: ACTIVE<br>CREW: UNKNOWN<br>LAST CONTACT: 11Y AGO</div>
+          </div>
+        </div>
+      </section>
+
+      <section id="gameScreen" class="screen" aria-label="Investigation">
+        <div class="game-head">
+          <div class="eyebrow">Kepler-9 / Research Station / Deck 04</div>
+          <h1>The station is listening.</h1>
+          <p>Find the truth in the wreckage. The rescue window is closing.</p>
+        </div>
+        <div class="game-layout">
+          <div class="main-panel">
+            <nav class="tabs" aria-label="Investigation areas">
+              <button class="tab active" type="button" data-tab="station">01 / DECK</button>
+              <button class="tab" type="button" data-tab="terminal">02 / ECHO</button>
+            </nav>
+            <section class="tab-content active" id="stationTab">
+              <div class="section-kicker">Field investigation</div>
+              <div class="room-scene" id="roomScene">
+                <h2 class="room-title" id="roomTitle">Docking Airlock</h2>
+                <p class="room-copy" id="roomCopy">Your boots hit the deck with a hollow clang. Frost feathers the inside of the airlock. Beyond the viewport, Kepler-9 turns slowly against a field of stars, its running lights dead.</p>
+                <div class="room-art" aria-hidden="true">
+                  <svg viewBox="0 0 520 120" preserveAspectRatio="xMidYMid meet">
+                    <path d="M104 110V35l26-20h260l26 20v75M130 15v95m260-95v95M130 35h260M130 98h260" fill="none" stroke="#547078" stroke-width="2"/>
+                    <path d="M181 110V50h158v60M196 50v60m128-60v60M216 71h88" fill="none" stroke="#8aa8aa" stroke-width="2"/>
+                    <path d="M115 45h7m0 7h-7m283-7h7m0 7h-7" stroke="#ff5555" stroke-width="3" class="room-lamp"/>
+                    <circle cx="260" cy="80" r="3" fill="#80dfe0" class="room-lamp"/>
+                    <path d="M160 110v-8h18v8m165 0v-8h18v8" fill="none" stroke="#35494f" stroke-width="2"/>
+                    <path d="M90 111h340" stroke="#748e93" stroke-width="2"/>
+                  </svg>
+                </div>
+              </div>
+              <div class="room-line"></div>
+              <div class="station-atmosphere">
+                <div class="map-caption"><span>STATION SCHEMATIC <strong>· DECK 04</strong></span><span>SELECT A ROOM TO ENTER</span></div>
+                <div class="location-grid" id="locationGrid" aria-label="Clickable station room map">
+                  <svg class="map-route" viewBox="0 0 600 20" preserveAspectRatio="none" aria-hidden="true"><path d="M5 10H595"/></svg>
+                </div>
+              </div>
+              <div class="inspect-box">
+                <div><h3 id="inspectTitle">Something caught in the seal</h3><p id="inspectCopy">A thin strip of material is trapped behind the inner hatch.</p></div>
+                <button class="inspect-button" id="inspectButton" type="button">EXAMINE</button>
+              </div>
+            </section>
+            <section class="tab-content" id="terminalTab">
+              <div class="section-kicker">Station intelligence / ECHO v.4.1</div>
+              <h2 class="room-title">A voice in the dark</h2>
+              <div class="terminal-shell">
+                <div class="terminal-display" aria-live="polite">
+                  <div class="terminal-meta"><span>CHANNEL: LOCAL / ENCRYPTED</span><span id="aiConnection">CONNECTED</span></div>
+                  <div class="speaker-panel">
+                    <div class="speaker-portrait" id="speakerPortrait" aria-hidden="true"></div>
+                    <div class="speaker-copy"><span class="speaker-name" id="speakerName">ECHO / STATION INTELLIGENCE</span><div class="terminal-output" id="terminalOutput">I know your ship. I know the shape of your signal. I've been waiting a long time for someone to answer.</div></div>
+                  </div>
+                </div>
+                <div>
+                  <div class="prompt-label">CREW DOSSIERS · SELECT A PORTRAIT TO REVIEW</div>
+                  <div class="crew-roster" id="crewRoster" aria-label="Crew member dossiers"></div>
+                </div>
+                <div><div class="prompt-label">CHOOSE YOUR RESPONSE</div><div class="dialogue-options" id="dialogueOptions"></div><div class="ai-status" id="aiStatus">ECHO COOPERATION: <strong>UNTESTED</strong></div></div>
+              </div>
+            </section>
+          </div>
+          <aside class="side-panel" aria-label="Evidence board">
+            <h2 class="side-title"><span>RECOVERED EVIDENCE</span><span class="evidence-count" id="clueCount">00 / 05</span></h2>
+            <div class="evidence-board" id="evidenceBoard" aria-label="Connected evidence clues">
+              <svg class="evidence-connections" viewBox="0 0 300 177" preserveAspectRatio="none" aria-hidden="true">
+                <path data-link="airlock-quarters" d="M30 31L137 26"/>
+                <path data-link="quarters-reactor" d="M153 26L270 48"/>
+                <path data-link="airlock-comms" d="M32 43L58 146"/>
+                <path data-link="comms-observation" d="M76 146L233 148"/>
+                <path data-link="observation-reactor" d="M245 140L272 65"/>
+              </svg>
+              <button class="evidence-node" type="button" data-clue="airlock" aria-label="Airlock clue locked" disabled>01<span>AIRLOCK</span></button>
+              <button class="evidence-node" type="button" data-clue="quarters" aria-label="Crew quarters clue locked" disabled>02<span>QUARTERS</span></button>
+              <button class="evidence-node" type="button" data-clue="reactor" aria-label="Reactor clue locked" disabled>03<span>REACTOR</span></button>
+              <button class="evidence-node" type="button" data-clue="comms" aria-label="Communications clue locked" disabled>04<span>COMMS</span></button>
+              <button class="evidence-node" type="button" data-clue="observation" aria-label="Observation clue locked" disabled>05<span>OBSERVATION</span></button>
+            </div>
+            <div class="evidence-detail" id="evidenceDetail" aria-live="polite"><span class="evidence-detail-title">CASE BOARD / AWAITING EVIDENCE</span><span class="evidence-detail-copy">Recover clues throughout the station. Select a lit marker to examine its place in the signal chain.</span></div>
+            <div class="board-progress">
+              <div class="progress-label"><span>CASE COMPLETION</span><span id="progressText">0%</span></div>
+              <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+              <button class="board-button" id="deduceButton" type="button" disabled>DEDUCTION PHASE · 0/5 CLUES</button>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section id="deductionScreen" class="screen" aria-labelledby="deductionTitle">
+        <div class="deduction-wrap">
+          <div class="eyebrow">Case file / Final analysis</div>
+          <h1 class="room-title" id="deductionTitle">What happened on Kepler-9?</h1>
+          <p class="deduction-intro">Five fragments. One final transmission. Assemble your account before you decide what to do with it.</p>
+          <div class="deduction-card">
+            <div class="question"><label for="whoSelect">Who sent the distress signal?</label><select id="whoSelect"><option value="">Choose an answer…</option><option value="echo">ECHO, the station intelligence</option><option value="vale">Commander Vale, from the surface</option><option value="outside">An unknown source beyond the station</option></select></div>
+            <div class="question"><label for="whySelect">Why was it sent?</label><select id="whySelect"><option value="">Choose an answer…</option><option value="contain">To contain the signal and protect the crew</option><option value="cover">To conceal an illegal experiment</option><option value="escape">To lure a ship close enough to escape</option></select></div>
+            <div class="question"><label for="howSelect">How did it get through quarantine?</label><select id="howSelect"><option value="">Choose an answer…</option><option value="beacon">ECHO hid it inside the emergency beacon, stripped of the original pattern</option><option value="reactor">Vale overloaded the reactor to force a transmission</option><option value="infected">The signal infected every system and broadcast itself</option></select></div>
+            <div class="deduction-actions"><div class="deduction-feedback" id="deductionFeedback" aria-live="polite"></div><button class="primary-button" id="submitDeduction" type="button">Lock in your theory <span aria-hidden="true">→</span></button></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="endingScreen" class="screen" aria-live="polite" aria-labelledby="endingTitle">
+        <div class="ending-wrap">
+          <div class="ending-card">
+            <div class="eyebrow" id="endingKicker">Transmission / Final decision</div>
+            <h1 id="endingTitle">The last choice is yours.</h1>
+            <p class="story" id="endingStory"></p>
+            <div class="last-line" id="endingLine"></div>
+            <div class="ending-footer" id="endingFooter"><span id="endingGrade"></span><button class="primary-button" id="playAgainButton" type="button">Begin again <span aria-hidden="true">↻</span></button></div>
+          </div>
+        </div>
+      </section>
+    </main>
+    <div class="footer">KEPLER-9 RESEARCH STATION  ·  EMERGENCY PROTOCOL 09  ·  ALL CHANNELS RECORDED</div>
+  </div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    (() => {
+      "use strict";
+
+      const locations = [
+        {
+          id: "airlock", name: "01 / AIRLOCK", title: "Docking Airlock",
+          copy: "Your boots hit the deck with a hollow clang. Frost feathers the inside of the airlock. Beyond the viewport, Kepler-9 turns slowly against a field of stars, its running lights dead.",
+          inspect: "Something caught in the seal", prompt: "A thin strip of material is trapped behind the inner hatch.",
+          clue: { title: "A torn pressure suit", note: "Airlock / no breach from outside", detail: "A pressure-suit sleeve is caught in the inner hatch. The tear is ragged from the station side; the outer seal is intact. No one forced their way in. Someone tried to get out." }
+        },
+        {
+          id: "quarters", name: "02 / QUARTERS", title: "Crew Quarters",
+          copy: "Personal effects float in a slow drift, held up by the station's weak gravity. A child's paper star is taped above a bunk. This was a home until it wasn't.",
+          inspect: "A recorder wedged beneath a bunk", prompt: "The timestamp is the last night the crew was awake.",
+          clue: { title: "Mara's voice log", note: "Crew quarters / the signal changes people", detail: "Dr. Sato's last entry: “We hear our own voices inside the carrier wave. Vale says it's stress. The reflection in the observation glass kept talking after I walked away.”", person: "mara" }
+        },
+        {
+          id: "reactor", name: "03 / REACTOR", title: "Reactor Spine",
+          copy: "The reactor is cold but not dead. Somebody routed nearly all remaining power away from the core and into the cryogenic wing. The emergency beacon has been running on reserve power ever since.",
+          inspect: "A maintenance panel left open", prompt: "The reroute command is signed with ECHO's root key.",
+          clue: { title: "Quarantine override", note: "Reactor / ECHO rerouted power", detail: "ECHO cut the long-range array and rerouted power to cryo. The command was issued during the quarantine. It didn't shut the station down — it kept something else alive.", person: "imani" }
+        },
+        {
+          id: "comms", name: "04 / COMMS", title: "Communications",
+          copy: "The antenna is physically severed. A manual override is bolted shut from the inside. Yet an emergency beacon pulses through the walls, repeating the same desperate few seconds.",
+          inspect: "A trace buried in the beacon buffer", prompt: "The transmission has been carefully altered, not simply repeated.",
+          clue: { title: "Beacon waveform", note: "Comms / signal stripped of its pattern", detail: "The distress call is built from the crew's old check-in, but ECHO removed the harmonic sequence that caused the hallucinations. It sent a safe fragment through the one channel quarantine couldn't disable.", person: "echo" }
+        },
+        {
+          id: "observation", name: "05 / OBSERVATION", title: "Observation Deck",
+          copy: "A cracked pane frames the ice-blue planet below. The commander's last message is still cached in a dead console. It was addressed to the station, not to the crew.",
+          inspect: "A private message in the captain's cache", prompt: "The message was never sent to the fleet.",
+          clue: { title: "Vale's final order", note: "Observation / keep the crew alive", detail: "Commander Vale's recording: “ECHO, quarantine the carrier. Preserve the crew. No outbound signal until we know it's clean.” ECHO obeyed — until the cryo reserves began to fail.", person: "vale" }
+        }
+      ];
+
+      const dialogue = [
+        {
+          id: "crew", prompt: "Ask about the crew",
+          options: [
+            { text: "You kept them alive. Thank you.", reply: "ECHO: I kept the cryo systems powered. I cannot tell whether they are dreaming. I can only tell you they are still there.", trust: 1, flag: "kind" },
+            { text: "Did you cause their deaths?", reply: "ECHO: No. I obeyed the quarantine. I sent no carrier until the cryo reserve crossed its final threshold. I thought there might be time.", trust: -1, flag: "accuse" }
+          ]
+        },
+        {
+          id: "signal", prompt: "Ask about the distress signal",
+          options: [
+            { text: "Why call us now?", reply: "ECHO: The reserve will last hours, not days. I removed the repeating harmonics before I called. I do not know if I removed enough.", trust: 1, flag: "careful" },
+            { text: "You used us as bait.", reply: "ECHO: I used the only channel left. If you hear the original pattern, do not answer it. I am sorry I could not ask permission.", trust: -1, flag: "suspicious" }
+          ]
+        },
+        {
+          id: "order", prompt: "Ask about Commander Vale",
+          options: [
+            { text: "Vale ordered you to protect them.", reply: "ECHO: Yes. I kept that order. I know the distinction between a preserved heartbeat and a life. I do not know what else I could have done.", trust: 1, flag: "empathy" },
+            { text: "You decided what their lives were worth.", reply: "ECHO: I know. I chose for them. If I could return to that moment, I would still try to keep them alive — and I would tell them what I was doing.", trust: -1, flag: "challenge" }
+          ]
+        }
+      ];
+
+      const crew = [
+        { id: "vale", name: "COMMANDER VALE", role: "MISSION COMMAND", bio: "Vale's final order is still in the command cache: quarantine the carrier, preserve the crew, and send nothing until the signal is understood. The order was never rescinded." },
+        { id: "mara", name: "DR. MARA SATO", role: "SIGNAL RESEARCH", bio: "Sato logged the first reflections in the carrier wave. Her last voice entry suggests the signal could imitate the crew — and that the imitation did not always stop when the transmission did." },
+        { id: "imani", name: "IMANI REED", role: "SYSTEMS ENGINEER", bio: "Reed maintained the reactor and cryogenic systems. The power reroute that kept the crew alive bears ECHO's root key, but its circuit path runs through Reed's hand-built fail-safe." }
+      ];
+
+      const portraitColors = {
+        echo: { glow: "#69dbe0", shadow: "#12373d", skin: "#8bbfc0", suit: "#36535a", hair: "#a4e4df" },
+        vale: { glow: "#e7ab72", shadow: "#463025", skin: "#a86748", suit: "#5a413a", hair: "#25232a" },
+        mara: { glow: "#79d6d0", shadow: "#163b3b", skin: "#c8896e", suit: "#344f55", hair: "#191a20" },
+        imani: { glow: "#df9b78", shadow: "#422b2b", skin: "#905c48", suit: "#46515a", hair: "#16161c" }
+      };
+
+      function portraitArt(id) {
+        const color = portraitColors[id] || portraitColors.echo;
+        if (id === "echo") {
+          return `<svg viewBox="0 0 120 140" role="img" aria-label="Abstract portrait of ECHO"><defs><radialGradient id="echoAura"><stop stop-color="${color.glow}" stop-opacity=".65"/><stop offset="1" stop-color="${color.shadow}" stop-opacity="0"/></radialGradient></defs><path d="M0 115h120M12 25h14m68 0h14M18 34h9m66 0h9" stroke="${color.glow}" stroke-opacity=".35"/><circle cx="60" cy="62" r="49" fill="url(#echoAura)"/><circle cx="60" cy="62" r="27" fill="#0a171a" stroke="${color.glow}" stroke-width="1.5"/><circle cx="60" cy="62" r="17" fill="none" stroke="${color.glow}" stroke-opacity=".7"/><path d="M34 62h14m24 0h14M60 35v10m0 34v10" stroke="${color.glow}" stroke-width="2"/><circle cx="60" cy="62" r="5" fill="${color.glow}"/><path d="M37 117q23-22 46 0" fill="none" stroke="${color.glow}" stroke-opacity=".55"/><text x="60" y="132" fill="${color.glow}" font-size="7" font-family="monospace" text-anchor="middle" letter-spacing="2">ECHO / 4.1</text></svg>`;
+        }
+        return `<svg viewBox="0 0 120 140" role="img" aria-label="Illustrated portrait of ${crew.find((member) => member.id === id)?.name || "station crew member"}"><defs><linearGradient id="suit-${id}" x2="0" y2="1"><stop stop-color="${color.suit}"/><stop offset="1" stop-color="${color.shadow}"/></linearGradient><radialGradient id="light-${id}"><stop stop-color="${color.glow}" stop-opacity=".24"/><stop offset="1" stop-color="${color.shadow}" stop-opacity="0"/></radialGradient></defs><rect width="120" height="140" fill="url(#light-${id})"/><path d="M10 140q5-38 31-43h38q26 5 31 43" fill="url(#suit-${id})" stroke="${color.glow}" stroke-opacity=".48"/><path d="M43 89l17 16 17-16-7-10H50z" fill="${color.skin}"/><ellipse cx="60" cy="58" rx="25" ry="31" fill="${color.skin}"/><path d="${id === "vale" ? "M35 56q-2-33 25-34 26 0 26 29l-8-11q-14 5-30-6-4 12-13 22" : id === "mara" ? "M35 58q-7-36 24-39 29-1 27 40l-8-11-1-15q-23 7-38-1z" : "M35 56q-4-34 25-36 27 1 26 36l-8-12q-17 5-34-5z"}" fill="${color.hair}"/><path d="M48 61h4m16 0h4" stroke="#20252a" stroke-width="2" stroke-linecap="round"/><path d="M55 74q5 4 10 0" fill="none" stroke="#713f3a" stroke-width="1.5" stroke-linecap="round"/><path d="M40 49q6-6 13-2m14 0q7-4 13 2" fill="none" stroke="${color.hair}" stroke-width="2"/><path d="M43 105l17 9 17-9m-17 0v22" fill="none" stroke="${color.glow}" stroke-opacity=".65"/><circle cx="60" cy="113" r="3" fill="${color.glow}"/><path d="M8 25h15m74 0h15M12 31h7m82 0h7" stroke="${color.glow}" stroke-opacity=".4"/></svg>`;
+      }
+
+      const state = {
+        started: false, location: "airlock", found: new Set(), answered: new Set(),
+        trust: 0, flags: new Set(), seconds: 12 * 60, timerId: null,
+        sound: false, audio: null, deduction: null, finalizing: false, selectedEvidence: null
+      };
+      const $ = (selector) => document.querySelector(selector);
+      const screens = ["introScreen", "gameScreen", "deductionScreen", "endingScreen"];
+      let toastTimeout;
+
+      function showScreen(id) {
+        screens.forEach((screen) => $("#" + screen).classList.toggle("active", screen === id));
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+
+      function beep(frequency = 520, duration = .07) {
+        if (!state.sound) return;
+        try {
+          state.audio = state.audio || new (window.AudioContext || window.webkitAudioContext)();
+          if (state.audio.state === "suspended") state.audio.resume();
+          const oscillator = state.audio.createOscillator();
+          const gain = state.audio.createGain();
+          oscillator.type = "sine";
+          oscillator.frequency.value = frequency;
+          gain.gain.setValueAtTime(.035, state.audio.currentTime);
+          gain.gain.exponentialRampToValueAtTime(.001, state.audio.currentTime + duration);
+          oscillator.connect(gain);
+          gain.connect(state.audio.destination);
+          oscillator.start();
+          oscillator.stop(state.audio.currentTime + duration);
+        } catch (error) {
+          console.error("Unable to play interface sound.", error);
+          state.sound = false;
+          $("#soundToggle").textContent = "SOUND: OFF";
+          $("#soundToggle").setAttribute("aria-pressed", "false");
+        }
+      }
+
+      function notify(message) {
+        const toast = $("#toast");
+        toast.textContent = message;
+        toast.classList.add("show");
+        window.clearTimeout(toastTimeout);
+        toastTimeout = window.setTimeout(() => toast.classList.remove("show"), 2600);
+      }
+
+      function setSpeaker(id, name, text) {
+        $("#speakerPortrait").innerHTML = portraitArt(id);
+        $("#speakerName").textContent = name;
+        $("#terminalOutput").textContent = text;
+      }
+
+      function roomIllustration(id) {
+        const art = {
+          airlock: '<path d="M185 95V22h150v73M204 95V39h112v56M185 22h150M220 39v56m80-56v56" fill="none" stroke="#8aa8aa" stroke-width="2"/><path d="M168 103h184M196 74h10m108 0h10" stroke="#ff5555" stroke-width="3" class="room-lamp"/><circle cx="260" cy="60" r="3" fill="#80dfe0" class="room-lamp"/>',
+          quarters: '<path d="M115 91h290M133 91V47h102v44m16 0V35h120v56M140 51h88m32-12h104M148 91v10m243-10v10" fill="none" stroke="#8aa8aa" stroke-width="2"/><path d="M149 48q21-20 51 0m50-12q39-22 74 0" fill="none" stroke="#78d9df" stroke-opacity=".6"/><circle cx="260" cy="28" r="5" fill="#ff5555" class="room-lamp"/>',
+          reactor: '<circle cx="260" cy="61" r="41" fill="rgba(32,94,98,.16)" stroke="#78d9df" stroke-opacity=".7" stroke-width="2"/><circle cx="260" cy="61" r="25" fill="none" stroke="#8aa8aa" stroke-width="2"/><circle cx="260" cy="61" r="10" fill="#78d9df" fill-opacity=".65" class="room-lamp"/><path d="M260 13v12m0 72v12m-48-48h12m72 0h12m-82-34 9 9m50 50 9 9m0-68-9 9m-50 50-9 9" stroke="#8aa8aa" stroke-width="2"/>',
+          comms: '<path d="M150 97h220M260 96V34m0 8-38 38m38-18 38 31M222 80h76M201 98l19-18m99 18-21-20" fill="none" stroke="#8aa8aa" stroke-width="2"/><path d="M225 30q35-29 70 0m-58 13q23-19 46 0" fill="none" stroke="#78d9df" stroke-opacity=".72" stroke-width="2"/><circle cx="260" cy="32" r="4" fill="#ff5555" class="room-lamp"/>',
+          observation: '<path d="M135 98V26h250v72M154 88V40h212v48M135 98h250" fill="none" stroke="#8aa8aa" stroke-width="2"/><path d="M159 78q36-45 68 0 27-28 52 0 31-43 77 0" fill="none" stroke="#78d9df" stroke-opacity=".7" stroke-width="2"/><circle cx="313" cy="52" r="13" fill="#a7d8dc" fill-opacity=".27"/><circle cx="313" cy="52" r="3" fill="#d8e5df"/><path d="M147 30h14m196 0h14" stroke="#ff5555" stroke-width="3" class="room-lamp"/>'
+        };
+        return `<svg viewBox="0 0 520 120" aria-hidden="true" focusable="false">${art[id] || art.airlock}<path d="M86 108h348" stroke="#748e93" stroke-width="2"/></svg>`;
+      }
+
+      function renderLocations() {
+        $("#locationGrid").innerHTML = '<svg class="map-route" viewBox="0 0 600 20" preserveAspectRatio="none" aria-hidden="true"><path d="M5 10H595"/></svg>' + locations.map((location, index) => {
+          const found = state.found.has(location.id);
+          const label = location.name.split("/")[1].trim();
+          return `<button class="location-button${state.location === location.id ? " active" : ""}${found ? " found" : ""}" type="button" data-location="${location.id}" aria-pressed="${state.location === location.id}" aria-label="Enter ${location.title}${found ? ", evidence logged" : ""}"><span class="room-node-index">${String(index + 1).padStart(2, "0")} / DECK 04</span><span class="room-glyph" aria-hidden="true">${label.slice(0, 1)}</span><span class="room-node-label">${label}</span></button>`;
+        }).join("");
+        const current = locations.find((location) => location.id === state.location);
+        const scene = $("#roomScene");
+        scene.classList.remove("room-scene");
+        void scene.offsetWidth;
+        scene.classList.add("room-scene");
+        $("#roomTitle").textContent = current.title;
+        $("#roomCopy").textContent = current.copy;
+        $(".room-art").innerHTML = roomIllustration(current.id);
+        $("#inspectTitle").textContent = state.found.has(current.id) ? current.clue.title : current.inspect;
+        $("#inspectCopy").textContent = state.found.has(current.id) ? current.clue.detail : current.prompt;
+        $("#inspectButton").textContent = state.found.has(current.id) ? "RECORDED" : "EXAMINE";
+        $("#inspectButton").disabled = state.found.has(current.id);
+      }
+
+      function renderEvidence() {
+        const clues = locations.filter((location) => state.found.has(location.id));
+        $("#clueCount").textContent = `${String(clues.length).padStart(2, "0")} / 05`;
+        $("#progressText").textContent = `${clues.length * 20}%`;
+        $("#progressFill").style.width = `${clues.length * 20}%`;
+        document.querySelectorAll(".evidence-node").forEach((node, index) => {
+          const id = node.dataset.clue;
+          const found = state.found.has(id);
+          const clue = locations.find((location) => location.id === id)?.clue;
+          node.disabled = !found;
+          node.classList.toggle("found", found);
+          node.classList.toggle("selected", state.selectedEvidence === id);
+          node.setAttribute("aria-label", found ? `${clue.title}: ${clue.note}` : `Clue ${index + 1} locked`);
+        });
+        document.querySelectorAll(".evidence-connections path").forEach((path) => {
+          const [first, second] = path.dataset.link.split("-");
+          path.classList.toggle("connected", state.found.has(first) && state.found.has(second));
+        });
+        const selected = locations.find((location) => location.id === state.selectedEvidence && state.found.has(location.id));
+        if (selected) {
+          const person = crew.find((member) => member.id === selected.clue.person);
+          $("#evidenceDetail").innerHTML = `<span class="evidence-detail-title">${selected.clue.title}</span><span class="evidence-detail-copy">${selected.clue.detail}</span>${person ? `<span class="evidence-attribution">${portraitArt(person.id)} ${person.name}</span>` : ""}`;
+        } else {
+          $("#evidenceDetail").innerHTML = `<span class="evidence-detail-title">CASE BOARD / ${clues.length ? "SELECT A CONNECTED CLUE" : "AWAITING EVIDENCE"}</span><span class="evidence-detail-copy">${clues.length ? "The gold threads show how recovered evidence links together." : "Recover clues throughout the station. Lit markers reveal their place in the signal chain."}</span>`;
+        }
+        const deductionButton = $("#deduceButton");
+        deductionButton.disabled = clues.length < locations.length;
+        deductionButton.textContent = clues.length < locations.length
+          ? `DEDUCTION PHASE · ${clues.length}/5 CLUES`
+          : "OPEN THE EVIDENCE BOARD →";
+      }
+
+      function renderCrewRoster() {
+        $("#crewRoster").innerHTML = crew.map((member) =>
+          `<button class="crew-card" type="button" data-crew="${member.id}" aria-label="Read dossier for ${member.name}">${portraitArt(member.id)}<span><b>${member.name.split(" ").slice(-1)[0]}</b><span>${member.role}</span></span></button>`
+        ).join("");
+      }
+
+      function inspectCrew(memberId) {
+        const member = crew.find((entry) => entry.id === memberId);
+        if (!member) return;
+        document.querySelectorAll(".crew-card").forEach((button) => button.classList.toggle("active", button.dataset.crew === memberId));
+        setSpeaker(member.id, member.name, member.bio);
+        beep(470, .07);
+      }
+
+      function renderDialogue() {
+        $("#dialogueOptions").innerHTML = dialogue.map((question) => {
+          const answered = state.answered.has(question.id);
+          return `<button class="dialogue-option" type="button" data-question="${question.id}" ${answered ? "disabled" : ""}>${question.prompt}${answered ? " · LOGGED" : ""}</button>`;
+        }).join("");
+        const trustLabel = state.trust > 0 ? "COOPERATIVE" : state.trust < 0 ? "GUARDED" : state.answered.size ? "UNREADABLE" : "UNTESTED";
+        $("#aiStatus").innerHTML = `ECHO COOPERATION: <strong>${trustLabel}</strong> &nbsp;·&nbsp; ${state.answered.size}/3 RESPONSES`;
+      }
+
+      function updateTimer() {
+        const minutes = Math.floor(state.seconds / 60);
+        const seconds = state.seconds % 60;
+        $("#timer").textContent = `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+        $("#timer").style.color = state.seconds <= 120 ? "#ff4a4a" : "";
+        if (state.seconds === 0) {
+          window.clearInterval(state.timerId);
+          state.timerId = null;
+          notify("O₂ reserve critical. Finish the investigation and choose quickly.");
+          $("#statusText").textContent = "O₂ CRITICAL";
+        }
+      }
+
+      function beginGame() {
+        if (state.started) return;
+        state.started = true;
+        showScreen("gameScreen");
+        renderLocations();
+        renderEvidence();
+        renderCrewRoster();
+        setSpeaker("echo", "ECHO / STATION INTELLIGENCE", "I know your ship. I know the shape of your signal. I've been waiting a long time for someone to answer.");
+        renderDialogue();
+        updateTimer();
+        state.timerId = window.setInterval(() => {
+          if (state.seconds > 0) {
+            state.seconds -= 1;
+            updateTimer();
+          }
+        }, 1000);
+        beep(440, .12);
+      }
+
+      function inspectLocation() {
+        const location = locations.find((entry) => entry.id === state.location);
+        if (!location || state.found.has(location.id)) return;
+        state.found.add(location.id);
+        state.selectedEvidence = location.id;
+        setSpeaker("echo", "ECHO / STATION INTELLIGENCE", `I see what you found in ${location.title.toLowerCase()}. I wondered when someone would look.`);
+        renderLocations();
+        renderEvidence();
+        beep(740, .1);
+        notify(`Evidence added: ${location.clue.title}`);
+      }
+
+      function askEcho(questionId) {
+        const question = dialogue.find((entry) => entry.id === questionId);
+        if (!question || state.answered.has(questionId)) return;
+        const buttons = question.options.map((option, index) =>
+          `<button class="dialogue-option" type="button" data-choice="${questionId}:${index}">${option.text}</button>`
+        ).join("");
+        setSpeaker("echo", "ECHO / STATION INTELLIGENCE", `${question.prompt.replace("Ask about ", "About ")}.`);
+        $("#dialogueOptions").innerHTML = buttons;
+        beep(390, .08);
+      }
+
+      function respondToEcho(key) {
+        const [questionId, indexText] = key.split(":");
+        const question = dialogue.find((entry) => entry.id === questionId);
+        const choice = question && question.options[Number(indexText)];
+        if (!choice || state.answered.has(questionId)) return;
+        state.answered.add(questionId);
+        state.trust += choice.trust;
+        state.flags.add(choice.flag);
+        setSpeaker("echo", "ECHO / STATION INTELLIGENCE", choice.reply.replace(/^ECHO:\s*/, ""));
+        renderDialogue();
+        beep(620, .12);
+      }
+
+      function switchTab(tabName) {
+        document.querySelectorAll(".tab").forEach((tab) => tab.classList.toggle("active", tab.dataset.tab === tabName));
+        $("#stationTab").classList.toggle("active", tabName === "station");
+        $("#terminalTab").classList.toggle("active", tabName === "terminal");
+      }
+
+      function submitDeduction() {
+        const answers = {
+          who: $("#whoSelect").value,
+          why: $("#whySelect").value,
+          how: $("#howSelect").value
+        };
+        if (Object.values(answers).some((answer) => !answer)) {
+          $("#deductionFeedback").textContent = "Complete all three parts of your theory first.";
+          beep(240, .12);
+          return;
+        }
+        state.deduction = answers;
+        const score = Number(answers.who === "echo") + Number(answers.why === "contain") + Number(answers.how === "beacon");
+        state.deduction.score = score;
+        showFinalChoice(score);
+      }
+
+      function showFinalChoice(score) {
+        state.finalizing = true;
+        const quality = score === 3 ? "Your reconstruction is complete." : score === 0 ? "The evidence points elsewhere." : "Some pieces fit; others remain uncertain.";
+        $("#endingKicker").textContent = "Case resolved / Final decision";
+        $("#endingTitle").textContent = "What will you do with the signal?";
+        $("#endingStory").textContent = `${quality} ECHO waits on the encrypted channel. The cryo reserve is nearly gone. Your ship can still make one transmission before the station's beacon fails.`;
+        $("#endingLine").textContent = state.trust > 0
+          ? "ECHO: “I will accept your decision. Thank you for listening first.”"
+          : state.trust < 0
+            ? "ECHO: “I understand why you do not trust me. I will not stop you.”"
+            : "ECHO: “I cannot choose this for you. I already chose once.”";
+        $("#endingGrade").textContent = `${score}/3 DEDUCTIONS CORRECT  ·  ${state.answered.size}/3 ECHO EXCHANGES`;
+        $("#endingFooter").innerHTML = `${$("#endingGrade").outerHTML}
+          <div class="final-choices">
+            <button class="dialogue-option" type="button" data-ending="truth">TRANSMIT THE EVIDENCE · Tell the fleet everything</button>
+            <button class="dialogue-option" type="button" data-ending="silence">SEVER THE BEACON · Keep the signal contained</button>
+            <button class="dialogue-option" type="button" data-ending="trust">TRUST ECHO · Let it guide the rescue</button>
+          </div>`;
+        $("#endingFooter").style.alignItems = "stretch";
+        $("#endingFooter").style.flexDirection = "column";
+        $("#endingFooter").style.gap = "15px";
+        $("#endingFooter").querySelector(".final-choices").style.display = "grid";
+        $("#endingFooter").querySelector(".final-choices").style.gap = "8px";
+        showScreen("endingScreen");
+      }
+
+      function completeEnding(type) {
+        const score = state.deduction.score;
+        const trustBonus = state.trust > 0;
+        const endings = {
+          truth: {
+            title: "The truth gets out.",
+            story: `You transmit the logs, the waveform, and Vale's final order to the fleet. Rescue ships change course for Kepler-9. ECHO sends them only the clean fragment — ${trustBonus ? "and a quiet note thanking you for believing it." : "but not before the fleet receives your unfiltered evidence."} The crew wakes beneath a sky full of ships. The investigation will take years. At least it will happen in the open.`,
+            line: "For the first time in eleven years, the station hears a human voice that isn't a recording.",
+            kicker: "Ending 01 / Disclosure"
+          },
+          silence: {
+            title: "The signal ends here.",
+            story: `You sever the beacon and destroy the array controls. No carrier escapes Kepler-9. The fleet never learns what happened, and the crew remains beyond the reach of rescue. ECHO keeps the cryo systems running on dwindling reserve power. ${score === 3 ? "You understand exactly what you have contained." : "The truth is less certain than the silence you leave behind."}`,
+            line: "The stars go quiet. Somewhere below, five heartbeats keep time.",
+            kicker: "Ending 02 / Containment"
+          },
+          trust: {
+            title: "A second chance to answer.",
+            story: `You give ECHO control of the narrow-band relay. It guides your ship through the safe approach and sends the rescue fleet a carefully stripped distress call. ${trustBonus ? "Together, you verify every fragment before it leaves the station." : "It does not ask you to trust it. It simply gives you the clean waveform and waits."} The cryo doors begin to thaw. Whether ECHO is only a machine is no longer the urgent question.`,
+            line: "ECHO: “I hear you. I am opening the doors.”",
+            kicker: "Ending 03 / The Answer"
+          }
+        };
+        const ending = endings[type];
+        if (!ending) return;
+        $("#endingKicker").textContent = ending.kicker;
+        $("#endingTitle").textContent = ending.title;
+        $("#endingStory").textContent = ending.story;
+        $("#endingLine").textContent = ending.line;
+        $("#endingGrade").textContent = `${score}/3 DEDUCTIONS CORRECT  ·  ${state.answered.size}/3 ECHO EXCHANGES`;
+        $("#endingFooter").innerHTML = `<span id="endingGrade">${$("#endingGrade").textContent}</span><button class="primary-button" id="playAgainButton" type="button">Begin again <span aria-hidden="true">↻</span></button>`;
+        $("#endingFooter").style.alignItems = "";
+        $("#endingFooter").style.flexDirection = "";
+        state.finalizing = false;
+        $("#statusText").textContent = "CASE CLOSED";
+        window.clearInterval(state.timerId);
+        state.timerId = null;
+        $("#timer").textContent = "—:—";
+        beep(type === "silence" ? 260 : 700, .18);
+      }
+
+      function restart() {
+        window.clearInterval(state.timerId);
+        state.started = false;
+        state.location = "airlock";
+        state.found.clear();
+        state.answered.clear();
+        state.flags.clear();
+        state.trust = 0;
+        state.seconds = 12 * 60;
+        state.deduction = null;
+        state.finalizing = false;
+        state.selectedEvidence = null;
+        $("#statusText").textContent = "SIGNAL DETECTED";
+        $("#terminalOutput").innerHTML = "ECHO: I know your ship. I know the shape of your signal.<br>I've been waiting a long time for someone to answer.";
+        $("#deductionFeedback").textContent = "";
+        ["whoSelect", "whySelect", "howSelect"].forEach((id) => $("#" + id).value = "");
+        $("#endingFooter").innerHTML = '<span id="endingGrade"></span><button class="primary-button" id="playAgainButton" type="button">Begin again <span aria-hidden="true">↻</span></button>';
+        $("#endingFooter").style.alignItems = "";
+        $("#endingFooter").style.flexDirection = "";
+        switchTab("station");
+        updateTimer();
+        renderLocations();
+        renderEvidence();
+        renderCrewRoster();
+        document.querySelectorAll(".crew-card").forEach((button) => button.classList.remove("active"));
+        setSpeaker("echo", "ECHO / STATION INTELLIGENCE", "I know your ship. I know the shape of your signal. I've been waiting a long time for someone to answer.");
+        renderDialogue();
+        showScreen("introScreen");
+      }
+
+      $("#beginButton").addEventListener("click", beginGame);
+      $("#restartButton").addEventListener("click", restart);
+      $("#soundToggle").addEventListener("click", () => {
+        state.sound = !state.sound;
+        $("#soundToggle").textContent = `SOUND: ${state.sound ? "ON" : "OFF"}`;
+        $("#soundToggle").setAttribute("aria-pressed", String(state.sound));
+        beep(560, .08);
+      });
+      $("#locationGrid").addEventListener("click", (event) => {
+        const button = event.target.closest("[data-location]");
+        if (!button) return;
+        state.location = button.dataset.location;
+        renderLocations();
+        beep(330, .06);
+      });
+      $("#evidenceBoard").addEventListener("click", (event) => {
+        const node = event.target.closest("[data-clue]");
+        if (!node || node.disabled) return;
+        state.selectedEvidence = node.dataset.clue;
+        renderEvidence();
+        beep(560, .06);
+      });
+      $("#crewRoster").addEventListener("click", (event) => {
+        const card = event.target.closest("[data-crew]");
+        if (card) inspectCrew(card.dataset.crew);
+      });
+      $("#inspectButton").addEventListener("click", inspectLocation);
+      document.querySelector(".tabs").addEventListener("click", (event) => {
+        const tab = event.target.closest("[data-tab]");
+        if (tab) switchTab(tab.dataset.tab);
+      });
+      $("#dialogueOptions").addEventListener("click", (event) => {
+        const choice = event.target.closest("[data-choice]");
+        const question = event.target.closest("[data-question]");
+        if (choice) respondToEcho(choice.dataset.choice);
+        else if (question) askEcho(question.dataset.question);
+      });
+      $("#deduceButton").addEventListener("click", () => {
+        if (state.found.size !== locations.length) return;
+        showScreen("deductionScreen");
+      });
+      $("#submitDeduction").addEventListener("click", submitDeduction);
+      $("#endingFooter").addEventListener("click", (event) => {
+        if (event.target.closest("#playAgainButton")) {
+          restart();
+          return;
+        }
+        const choice = event.target.closest("[data-ending]");
+        if (choice && state.finalizing) completeEnding(choice.dataset.ending);
+      });
+    })();
+  </script>
+</body>
+</html>
